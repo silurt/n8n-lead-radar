@@ -16,8 +16,7 @@
     "build": "node --experimental-strip-types scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build",
-    "test": "node --test test/*.test.mjs",
-    "check:generated": "npm run build && git diff --exit-code --stat dist/"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@n8n/workflow-sdk": "0.35.4"

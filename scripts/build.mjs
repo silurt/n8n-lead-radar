@@ -15,13 +15,14 @@ const SRC = 'src/workflows'
 const OUT = 'dist'
 
 /**
- * Node and group ids are fresh UUIDs on every build, which makes the committed
- * output differ from a rebuild of the same source and every diff unreadable.
+ * Node and group ids are fresh UUIDs on every build, so the same source produces
+ * a different file each time.
  *
  * The SDK takes name-keyed id maps for this, so the previous output is read back
  * and its ids carried forward: a node that kept its name keeps its id, and only
- * a genuinely new node gets a new one. That is what makes `check:generated` a
- * meaningful gate rather than one that can never pass.
+ * a genuinely new node gets a new one. Two builds of unchanged source produce
+ * byte-identical output, so re-importing does not churn the ids n8n matches
+ * nodes on, and a real change is legible in the diff.
  */
 function existingIds(path) {
   if (!existsSync(path)) return { nodes: undefined, groups: undefined }

@@ -1,9 +1,6 @@
-# Three gates, in the order they get cheaper to fix.
-#
-# `check:generated` is the one worth explaining: dist/ is committed, because the
-# importable JSON is what this repo is for and a visitor should be able to read
-# it without cloning and building. Committed generated output drifts, so the
-# build runs again here and the job fails if it produces a diff.
+# Typecheck, then the structural gates on the built graph. `npm test` builds
+# first via pretest, so a workflow that fails the SDK's validator fails here
+# before any assertion runs.
 name: ci
 
 on:
@@ -22,4 +19,3 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npm run check:generated

@@ -42,7 +42,13 @@ npm test           # structural gates on the built JSON
 npm run typecheck
 ```
 
-Import `dist/lead-radar.json` with **Workflows > Import from file**.
+`dist/` is generated and not committed, so build first, then import
+`dist/lead-radar.json` with **Workflows > Import from file**.
+
+The build is reproducible: node ids are carried forward by node name from any
+previous output rather than minted fresh, and the webhook id is pinned in source.
+Re-importing a rebuilt workflow therefore does not churn the ids n8n matches
+nodes on.
 
 ## The pipeline
 
