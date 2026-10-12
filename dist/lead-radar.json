@@ -1,0 +1,777 @@
+{
+  "id": "lead-radar",
+  "name": "Grounded consultancy lead pipeline",
+  "nodes": [
+    {
+      "id": "06bfd882-08af-49c0-8dfb-04030db1422e",
+      "name": "Every morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a0a1f5b9-8262-4e9a-ae56-151ed57620f2",
+      "name": "Boards",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        300,
+        300
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"boards\":[{\"ats\":\"ashby\",\"slug\":\"notion\",\"url\":\"https://api.ashbyhq.com/posting-api/job-board/notion?includeCompensation=true\"},{\"ats\":\"greenhouse\",\"slug\":\"gitlab\",\"url\":\"https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true\"},{\"ats\":\"lever\",\"slug\":\"palantir\",\"url\":\"https://api.lever.co/v0/postings/palantir?mode=json\"},{\"ats\":\"workable\",\"slug\":\"enjins\",\"url\":\"https://apply.workable.com/api/v1/widget/accounts/enjins?details=true\"}]}"
+      }
+    },
+    {
+      "id": "c961b98a-f55e-4ca8-a8ad-e239263751a4",
+      "name": "One board per item",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "fieldToSplitOut": "boards"
+      }
+    },
+    {
+      "id": "a36e5129-0849-4436-b3b3-27c05603bd48",
+      "name": "Fetch postings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "06c74645-4067-418b-a41e-6fa8108fa9bb",
+      "name": "Board unreachable",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        900,
+        450
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stage",
+              "name": "stage",
+              "type": "string",
+              "value": "fetch"
+            },
+            {
+              "id": "reason",
+              "name": "reason",
+              "type": "string",
+              "value": "={{ $json.error ?? \"request failed\" }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c4e67502-eaf6-45e2-8ff6-fab29fca4a6d",
+      "name": "Normalise",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const out = []\nfor (const item of $input.all()) {\n  const ats = item.json.ats ?? $(\"One board per item\").first().json.ats\n  const body = item.json\n  const rows =\n    ats === \"ashby\" ? (body.jobs ?? [])\n    : ats === \"greenhouse\" ? (body.jobs ?? [])\n    : ats === \"lever\" ? (Array.isArray(body) ? body : [])\n    : (body.jobs ?? [])\n  for (const r of rows) {\n    out.push({ json: {\n      leadId: `${ats}:${r.id ?? r.jobId ?? r.shortcode ?? r.title}`,\n      ats,\n      title: r.title ?? r.text ?? r.name ?? \"\",\n      location: r.location?.name ?? r.location ?? r.categories?.location ?? \"\",\n      url: r.jobUrl ?? r.absolute_url ?? r.hostedUrl ?? r.url ?? \"\",\n      body: r.descriptionPlain ?? r.content ?? r.description ?? r.descriptionHtml ?? \"\",\n    } })\n  }\n}\nreturn out"
+      }
+    },
+    {
+      "id": "404b43a0-7542-4be6-ad4d-dab1dc9c09c0",
+      "name": "Seen before?",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        500,
+        450
+      ],
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.leadId }}"
+      }
+    },
+    {
+      "id": "001bee2e-7604-4542-8d41-f6bb3ffbf58e",
+      "name": "Worth a look?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        450
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-url",
+              "leftValue": "={{ $json.url }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "region",
+              "leftValue": "={{ $json.location + \" \" + $json.body }}",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              },
+              "rightValue": "(?i)(remote|europe|emea|netherlands|amsterdam|germany|berlin|munich)"
+            },
+            {
+              "id": "not-junior",
+              "leftValue": "={{ $json.title }}",
+              "operator": {
+                "type": "string",
+                "operation": "notRegex"
+              },
+              "rightValue": "(?i)(intern|junior|graduate|working student|apprentice)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a0bac943-4847-429f-9454-cf8066ab9cf9",
+      "name": "Summarise run",
+      "type": "n8n-nodes-base.summarize",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        450
+      ],
+      "parameters": {
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "aggregation": "count",
+              "field": "leadId"
+            }
+          ]
+        },
+        "fieldsToSplitBy": "verdict"
+      }
+    },
+    {
+      "id": "2e23737a-13a6-4325-bf3b-178848db9d7b",
+      "name": "Retrieve evidence",
+      "type": "@silurt/n8n-nodes-aws-bedrock.awsBedrock",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        600
+      ],
+      "parameters": {
+        "resource": "knowledgeBase",
+        "operation": "retrieve",
+        "knowledgeBaseId": "<__PLACEHOLDER_VALUE__the knowledge base holding the evidence corpus__>",
+        "query": "={{ $json.title + \"\\n\\n\" + $json.body }}"
+      },
+      "credentials": {
+        "aws": "AWS account"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "920fdfb2-aa50-48f3-b27a-7959ef7b7331",
+      "name": "Draft outreach",
+      "type": "@silurt/n8n-nodes-aws-bedrock.awsBedrock",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        600
+      ],
+      "parameters": {
+        "resource": "knowledgeBase",
+        "operation": "retrieveAndGenerate",
+        "knowledgeBaseId": "<__PLACEHOLDER_VALUE__the same knowledge base as Retrieve evidence__>",
+        "modelArn": "<__PLACEHOLDER_VALUE__the model ARN to generate with__>",
+        "query": "={{ \"Write a short, specific opening message for this role, using only the retrieved evidence. Name the single most relevant piece of experience and nothing else.\\n\\nRole: \" + $(\"Per lead\").item.json.title + \"\\n\\n\" + $(\"Per lead\").item.json.body }}"
+      },
+      "credentials": {
+        "aws": "AWS account"
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "52d83dec-0937-4e08-9fb3-6f9c6a854403",
+      "name": "Check grounding",
+      "type": "@silurt/n8n-nodes-aws-bedrock.awsBedrock",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        600
+      ],
+      "parameters": {
+        "resource": "guardrail",
+        "operation": "apply",
+        "guardrailIdentifier": "<__PLACEHOLDER_VALUE__the guardrail with the contextual-grounding policy__>",
+        "guardrailVersion": "<__PLACEHOLDER_VALUE__its version, or DRAFT__>",
+        "source": "OUTPUT",
+        "text": "={{ $json.output?.text ?? $json.text }}"
+      },
+      "credentials": {
+        "aws": "AWS account"
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "0f244d1a-19eb-449f-8cc3-164f3388c666",
+      "name": "Grounded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1700,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "no-intervention",
+              "leftValue": "={{ $json.action }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "rightValue": "GUARDRAIL_INTERVENED"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "1ea57d97-1e62-4813-9e73-250601ad4003",
+      "name": "Record lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1900,
+        600
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "leadId",
+              "name": "leadId",
+              "type": "string",
+              "value": "={{ $(\"Per lead\").item.json.leadId }}"
+            },
+            {
+              "id": "title",
+              "name": "title",
+              "type": "string",
+              "value": "={{ $(\"Per lead\").item.json.title }}"
+            },
+            {
+              "id": "url",
+              "name": "url",
+              "type": "string",
+              "value": "={{ $(\"Per lead\").item.json.url }}"
+            },
+            {
+              "id": "draft",
+              "name": "draft",
+              "type": "string",
+              "value": "={{ $(\"Draft outreach\").item.json.output?.text }}"
+            },
+            {
+              "id": "verdict",
+              "name": "verdict",
+              "type": "string",
+              "value": "grounded"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4b3528fe-ad05-4223-a092-964579892a91",
+      "name": "Per lead",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        900,
+        450
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "reset": false
+        }
+      }
+    },
+    {
+      "id": "802ed5c4-f168-4d44-baa5-9a5292cfb3ac",
+      "name": "Flag for review",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1900,
+        750
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "leadId",
+              "name": "leadId",
+              "type": "string",
+              "value": "={{ $(\"Per lead\").item.json.leadId }}"
+            },
+            {
+              "id": "url",
+              "name": "url",
+              "type": "string",
+              "value": "={{ $(\"Per lead\").item.json.url }}"
+            },
+            {
+              "id": "draft",
+              "name": "draft",
+              "type": "string",
+              "value": "={{ $(\"Draft outreach\").item.json.output?.text }}"
+            },
+            {
+              "id": "verdict",
+              "name": "verdict",
+              "type": "string",
+              "value": "ungrounded"
+            },
+            {
+              "id": "assessments",
+              "name": "assessments",
+              "type": "string",
+              "value": "={{ JSON.stringify($json.assessments ?? []) }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d73fe405-b797-42da-bca5-2169cdcb3ac6",
+      "name": "Bedrock failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1300,
+        750
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stage",
+              "name": "stage",
+              "type": "string",
+              "value": "bedrock"
+            },
+            {
+              "id": "reason",
+              "name": "reason",
+              "type": "string",
+              "value": "={{ $json.error?.message ?? \"call failed\" }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "dce3b8e6-ccea-41f7-b16c-b65aa5e314db",
+      "name": "Lead pushed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        100,
+        450
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead",
+        "responseMode": "lastNode"
+      },
+      "webhookId": "0f8c6a52-4b1d-4e67-9a3f-5c7e2d9b1a40"
+    },
+    {
+      "id": "d3a9e8ad-8300-4321-be6b-4497da606149",
+      "name": "Normalise pushed lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        300,
+        450
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "leadId",
+              "name": "leadId",
+              "type": "string",
+              "value": "={{ \"pushed:\" + $json.body.url }}"
+            },
+            {
+              "id": "ats",
+              "name": "ats",
+              "type": "string",
+              "value": "pushed"
+            },
+            {
+              "id": "title",
+              "name": "title",
+              "type": "string",
+              "value": "={{ $json.body.title }}"
+            },
+            {
+              "id": "location",
+              "name": "location",
+              "type": "string",
+              "value": "={{ $json.body.location ?? \"\" }}"
+            },
+            {
+              "id": "url",
+              "name": "url",
+              "type": "string",
+              "value": "={{ $json.body.url }}"
+            },
+            {
+              "id": "body",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.body.body ?? \"\" }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every morning": {
+      "main": [
+        [
+          {
+            "node": "Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Boards": {
+      "main": [
+        [
+          {
+            "node": "One board per item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One board per item": {
+      "main": [
+        [
+          {
+            "node": "Fetch postings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch postings": {
+      "main": [
+        [
+          {
+            "node": "Normalise",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Board unreachable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise": {
+      "main": [
+        [
+          {
+            "node": "Seen before?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seen before?": {
+      "main": [
+        [
+          {
+            "node": "Worth a look?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Worth a look?": {
+      "main": [
+        [
+          {
+            "node": "Per lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve evidence": {
+      "main": [
+        [
+          {
+            "node": "Draft outreach",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bedrock failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft outreach": {
+      "main": [
+        [
+          {
+            "node": "Check grounding",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bedrock failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check grounding": {
+      "main": [
+        [
+          {
+            "node": "Grounded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bedrock failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grounded?": {
+      "main": [
+        [
+          {
+            "node": "Record lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Flag for review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record lead": {
+      "main": [
+        [
+          {
+            "node": "Per lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Per lead": {
+      "main": [
+        [
+          {
+            "node": "Summarise run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retrieve evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flag for review": {
+      "main": [
+        [
+          {
+            "node": "Per lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bedrock failed": {
+      "main": [
+        [
+          {
+            "node": "Per lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead pushed": {
+      "main": [
+        [
+          {
+            "node": "Normalise pushed lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise pushed lead": {
+      "main": [
+        [
+          {
+            "node": "Seen before?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "nodeGroups": [
+    {
+      "id": "230561ac-b1d4-4f9e-b1c3-28cafeb68dc4",
+      "name": "Ingest",
+      "nodeIds": [
+        "a0a1f5b9-8262-4e9a-ae56-151ed57620f2",
+        "c961b98a-f55e-4ca8-a8ad-e239263751a4",
+        "a36e5129-0849-4436-b3b3-27c05603bd48",
+        "06c74645-4067-418b-a41e-6fa8108fa9bb"
+      ],
+      "description": "Pulls postings from four ATS APIs, one request per board, failures routed aside"
+    },
+    {
+      "id": "07149013-67ff-433f-80b2-a838665bf91e",
+      "name": "Normalise",
+      "nodeIds": [
+        "c4e67502-eaf6-45e2-8ff6-fab29fca4a6d",
+        "d3a9e8ad-8300-4321-be6b-4497da606149",
+        "404b43a0-7542-4be6-ad4d-dab1dc9c09c0"
+      ],
+      "description": "Four payload shapes into one lead record, deduplicated across runs"
+    },
+    {
+      "id": "6cd22458-ebd5-440d-ada6-4d9ab4d5f823",
+      "name": "Grounded drafting",
+      "nodeIds": [
+        "2e23737a-13a6-4325-bf3b-178848db9d7b",
+        "920fdfb2-aa50-48f3-b27a-7959ef7b7331",
+        "52d83dec-0937-4e08-9fb3-6f9c6a854403",
+        "0f244d1a-19eb-449f-8cc3-164f3388c666"
+      ],
+      "description": "Match against the evidence corpus, draft from it, then reject anything it does not support"
+    }
+  ]
+}

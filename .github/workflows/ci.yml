@@ -1,0 +1,25 @@
+# Three gates, in the order they get cheaper to fix.
+#
+# `check:generated` is the one worth explaining: dist/ is committed, because the
+# importable JSON is what this repo is for and a visitor should be able to read
+# it without cloning and building. Committed generated output drifts, so the
+# build runs again here and the job fails if it produces a diff.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run check:generated

@@ -58,6 +58,10 @@ const leadPushed = trigger({
   version: 2,
   config: {
     name: 'Lead pushed',
+    // Pinned rather than generated. n8n mints a fresh webhookId on every build
+    // otherwise, which both moves the webhook's URL and is the last thing
+    // keeping the generated JSON from matching a rebuild of the same source.
+    webhookId: '0f8c6a52-4b1d-4e67-9a3f-5c7e2d9b1a40',
     parameters: { httpMethod: 'POST', path: 'lead', responseMode: 'lastNode' },
   },
 })
