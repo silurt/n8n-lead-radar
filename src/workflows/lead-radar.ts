@@ -65,7 +65,10 @@ const leadPushed = trigger({
 /**
  * The board list, as data rather than as one HTTP node per source. Each entry
  * carries its own URL, so adding a company is a line here and no graph change.
- * Endpoints are the ones the jobhunt fetchers already use.
+ *
+ * The four companies are illustrative, one per supported ATS, chosen because
+ * their boards are public and each endpoint answered 200 on 2026-10-12. Swap in
+ * your own; nothing else in the graph changes.
  */
 const boards = node({
   type: 'n8n-nodes-base.set',
@@ -78,23 +81,23 @@ const boards = node({
         boards: [
           {
             ats: 'ashby',
-            slug: 'n8n',
-            url: 'https://api.ashbyhq.com/posting-api/job-board/n8n?includeCompensation=true',
+            slug: 'notion',
+            url: 'https://api.ashbyhq.com/posting-api/job-board/notion?includeCompensation=true',
           },
           {
             ats: 'greenhouse',
-            slug: 'datasnipper',
-            url: 'https://boards-api.greenhouse.io/v1/boards/datasnipper/jobs?content=true',
+            slug: 'gitlab',
+            url: 'https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true',
           },
           {
             ats: 'lever',
-            slug: 'telnyx',
-            url: 'https://api.lever.co/v0/postings/telnyx?mode=json',
+            slug: 'palantir',
+            url: 'https://api.lever.co/v0/postings/palantir?mode=json',
           },
           {
             ats: 'workable',
-            slug: 'mews',
-            url: 'https://apply.workable.com/api/v1/widget/accounts/mews?details=true',
+            slug: 'enjins',
+            url: 'https://apply.workable.com/api/v1/widget/accounts/enjins?details=true',
           },
         ],
       }),
