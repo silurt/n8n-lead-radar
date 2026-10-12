@@ -1,0 +1,28 @@
+{
+  "name": "n8n-lead-radar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "n8n workflows authored as code with @n8n/workflow-sdk, type-checked and validated before export. Flagship: a grounded consultancy lead pipeline whose outreach drafts are gated by a Bedrock guardrail.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "author": {
+    "name": "Simon Rothert",
+    "email": "puresamari@gmail.com"
+  },
+  "engines": {
+    "node": ">=20.15"
+  },
+  "scripts": {
+    "build": "node --experimental-strip-types scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@n8n/workflow-sdk": "0.35.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
