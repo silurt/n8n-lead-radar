@@ -356,9 +356,15 @@ const draftOutreach = node({
 })
 
 /**
- * The gate. A contextual-grounding policy on the guardrail checks the draft
- * against the passages that were retrieved, so a sentence the corpus does not
- * support is an intervention rather than something that goes out.
+ * The gate. A contextual-grounding policy checks the draft against the passages
+ * that were actually retrieved, so a sentence the corpus does not support is an
+ * intervention rather than something that goes out.
+ *
+ * The grounding source is pulled back from `Retrieve evidence`, two nodes
+ * upstream, because the policy grounds against the passages rather than against
+ * whatever the generating call chose to cite. Needs
+ * `@silurt/n8n-nodes-aws-bedrock` 0.2.0 or later: before that the node sent one
+ * unlabelled content block, which Bedrock cannot run a grounding check on.
  */
 const checkGrounding = node({
   type: '@silurt/n8n-nodes-aws-bedrock.awsBedrock',
@@ -371,7 +377,11 @@ const checkGrounding = node({
       guardrailIdentifier: placeholder('the guardrail with the contextual-grounding policy'),
       guardrailVersion: placeholder('its version, or DRAFT'),
       source: 'OUTPUT',
-      text: expr('{{ $json.output?.text ?? $json.text }}'),
+      text: expr('{{ $json.output.text }}'),
+      groundingSource: expr(
+        "{{ ($('Retrieve evidence').item.json.retrievalResults ?? []).map(r => r.content.text).join('\\n\\n') }}",
+      ),
+      groundingQuery: expr("{{ $('Per lead').item.json.title }}"),
     },
     credentials: { aws: AWS_CREDENTIAL },
     retryOnFail: true,

@@ -15,7 +15,7 @@ invent the experience that would make the pitch land. A contextual-grounding
 guardrail is what stops the draft going out when it does.
 
 **Status: builds and validates, not yet run against live AWS.** The graph is
-checked by nine structural tests and the SDK's own validator. Five parameters are
+checked by ten structural tests and the SDK's own validator. Five parameters are
 still placeholders, listed below, because they name AWS resources that do not
 exist yet.
 
@@ -26,7 +26,7 @@ instead buys three things that matter at nineteen nodes:
 
 - A broken graph fails at `npm run build` with a message, not after an import that
   half worked.
-- Invariants that are expensive to see by eye become tests. Two of the nine exist
+- Invariants that are expensive to see by eye become tests. Three of the ten exist
   because the invariant was broken during the writing of this workflow.
 - The diff is readable. A moved node in the UI rewrites coordinates throughout the
   JSON; here it does not appear at all.
@@ -64,6 +64,10 @@ All three operations of
 [`@silurt/n8n-nodes-aws-bedrock`](https://www.npmjs.com/package/@silurt/n8n-nodes-aws-bedrock)
 are load-bearing here: `retrieve` finds the evidence, `retrieveAndGenerate` writes
 from it, and `apply` on a guardrail decides whether what was written is supported.
+**Needs 0.2.0 or later.** The first version of this workflow claimed a grounding
+check it could not perform, because the node sent the text as a single unlabelled
+content block and Bedrock selects the grounding policy from those labels. Building
+this is what found that, and 0.2.0 is the fix.
 
 An intervention is not a failure. It means the draft claimed something the corpus
 does not carry, which is either a bad draft or a real gap in the corpus, and both
@@ -72,7 +76,7 @@ assessments rather than discarding the item.
 
 ## What the tests check
 
-Nine gates, run against the built JSON rather than the source:
+Ten gates, run against the built JSON rather than the source:
 
 - Every connection names a node that exists.
 - The Bedrock nodes carry the published scoped package name, so an import does not
@@ -88,6 +92,10 @@ Nine gates, run against the built JSON rather than the source:
 - Everything that leaves the machine retries.
 - Unresolved placeholders are counted, so shipping one is a deliberate act.
 - Every group has a description, within the length the UI shows.
+- **The grounding check grounds against the retrieved passages**, reading them back
+  from the Retrieve node rather than from the generated answer, with the source set
+  to OUTPUT. All of that has to hold for the claim to be true, and none of it is
+  visible in a screenshot.
 
 ## Still placeholders
 

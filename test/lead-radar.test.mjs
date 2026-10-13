@@ -162,3 +162,29 @@ test('every group names its members and says what it is for', () => {
     }
   }
 })
+
+test('the grounding check is actually wired to ground against something', () => {
+  // This workflow shipped once claiming a contextual grounding check it could
+  // not perform: the node sent one unlabelled content block, so Bedrock ran the
+  // guardrail's other policies and the grounding policy never fired. The claim
+  // is only true while all of the below hold.
+  const guard = wf.nodes.find(
+    (n) => n.parameters?.resource === 'guardrail' && n.parameters?.operation === 'apply',
+  )
+  assert.ok(guard, 'no guardrail node')
+
+  assert.equal(guard.parameters.source, 'OUTPUT', 'contextual grounding does not apply to input')
+
+  const src = guard.parameters.groundingSource
+  assert.ok(src?.length > 0, 'groundingSource is empty, so there is nothing to ground against')
+  assert.match(
+    src,
+    /Retrieve evidence/,
+    'groundingSource must read the retrieved passages, not the generated answer',
+  )
+
+  assert.ok(
+    guard.parameters.groundingQuery?.length > 0,
+    'groundingQuery is empty, so the relevance half of the check cannot run',
+  )
+})
